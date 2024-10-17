@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  name         String
+  password     String
+  refreshToken String?
+
+  products Products[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Products {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  price       Float
+  image       String
+  slug        String   @unique
+  category_id String
+  category    Category @relation(fields: [category_id], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("products")
+}
+
+model Category {
+  id         String     @id @default(uuid())
+  name       String     @default("Uncategorized")
+  products   Products[]
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+
+  @@map("categories")
+}
+
+model Leads {
+  id         String     @id @default(uuid())
+  slug       String     @unique
+  name       String
+  email      String
+  phone      String?
+  message    String
+  type       Type       @default(onprocess)
+  comments   Comments[]
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+
+  @@map("leads")
+}
+
+enum Type {
+  onprocess
+  Converted
+  notinterested
+}
+
+model Comments {
+  id         String   @id @default(uuid())
+  message    String
+  lead_id    String
+  lead       Leads    @relation(fields: [lead_id], references: [id])
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("comments")
+}
