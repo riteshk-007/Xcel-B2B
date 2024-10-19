@@ -121,9 +121,9 @@ export default function ProductsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="space-y-4">
-              {[...Array(ITEMS_PER_PAGE)].map((_, index) => (
-                <Skeleton key={index} className="h-20 w-full" />
+            <div className="space-y-2">
+              {[...Array(3)].map((_, index) => (
+                <Skeleton key={index} className="h-20 w-full bg-gray-300" />
               ))}
             </div>
           ) : error ? (

@@ -277,7 +277,7 @@ export function LeadCard({ lead, onStatusChange, onDelete }) {
           {loading ? (
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, index) => (
-                <Skeleton key={index} className="h-10 w-full" />
+                <Skeleton key={index} className="h-10 w-full bg-gray-300" />
               ))}
             </div>
           ) : error ? (

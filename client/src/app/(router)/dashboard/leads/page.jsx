@@ -145,7 +145,7 @@ export default function LeadsPage() {
           <SearchComponent
             apiEndpoint={`${process.env.NEXT_PUBLIC_API_URL}/leads/search`}
             renderCard={renderLeadCard}
-            placeholder="Search leads by name, email, phone, or message..."
+            placeholder="Search leads by name, email, or phone."
           />
         </div>
         <Select onValueChange={handleFilterChange} value={filter}>
@@ -165,8 +165,8 @@ export default function LeadsPage() {
       <ScrollArea className="h-[calc(100vh-200px)]">
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Array.from({ length: ITEMS_PER_PAGE }).map((_, index) => (
-              <Skeleton key={index} className="h-80 w-full" />
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-80 w-full bg-gray-300" />
             ))}
           </div>
         ) : error ? (
