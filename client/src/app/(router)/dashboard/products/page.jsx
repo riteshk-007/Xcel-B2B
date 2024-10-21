@@ -51,6 +51,7 @@ export default function ProductsPage() {
       const response = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/product?page=${currentPage}&limit=${ITEMS_PER_PAGE}`
       );
+
       setProducts(response.data.data.products);
       setTotalPages(response.data.data.totalPages);
     } catch (error) {

@@ -1,7 +1,22 @@
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { MoreVertical } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -17,13 +32,13 @@ const RenderProductCard = ({ product, handleDelete }) => (
         className="rounded-md object-cover"
       />
     </TableCell>
-    <TableCell className="font-medium">
-      {product.title || "Untitled"}
-    </TableCell>
+    <TableCell className="font-medium">{product.title || "Untitled"}</TableCell>
     <TableCell className="hidden md:table-cell">
       {product.slug || "No slug"}
     </TableCell>
-    <TableCell>{product.category?.name || "No category"}</TableCell>
+    <TableCell>
+      {product.categories.map((category) => category.name).join(", ")}
+    </TableCell>
     <TableCell>₹{product.price?.toFixed(2) || "No price"}</TableCell>
     <TableCell className="text-right">
       <DropdownMenu>
@@ -47,7 +62,8 @@ const RenderProductCard = ({ product, handleDelete }) => (
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the product from our servers.
+                  This action cannot be undone. This will permanently delete the
+                  product from our servers.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

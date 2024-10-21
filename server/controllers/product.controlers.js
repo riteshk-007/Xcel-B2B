@@ -35,23 +35,20 @@ const generateUniqueSlug = async (slug, name) => {
   return uniqueSlug;
 };
 
-const update = async (slug, data) => {
-  const product = await prisma.products.update({ where: { slug }, data });
-  if (!product) {
-    throw new ApiError(500, "Failed to update product");
-  }
-  return product;
-};
-
 const findAll = async (page = 1, limit = 10) => {
   const offset = (page - 1) * limit;
   const products = await prisma.products.findMany({
     skip: offset,
     take: limit,
     include: {
-      category: {
+      categories: {
         select: {
-          name: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
     },
@@ -60,8 +57,16 @@ const findAll = async (page = 1, limit = 10) => {
   const totalProducts = await prisma.products.count();
   const totalPages = Math.ceil(totalProducts / limit);
 
+  const formattedProducts = products.map((product) => ({
+    ...product,
+    categories: product.categories.map((c) => ({
+      id: c.category.id,
+      name: c.category.name,
+    })),
+  }));
+
   return {
-    products,
+    products: formattedProducts,
     totalProducts,
     totalPages,
     currentPage: page,
@@ -71,7 +76,18 @@ const findAll = async (page = 1, limit = 10) => {
 const findOne = async (slug) => {
   const result = await prisma.products.findUnique({
     where: { slug },
-    include: { category: { select: { name: true } } },
+    include: {
+      categories: {
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!result) {
@@ -79,12 +95,13 @@ const findOne = async (slug) => {
   }
   return result;
 };
-
 const remove = async (slug) => {
   const product = await prisma.products.findUnique({ where: { slug } });
   if (!product) {
     throw new ApiError(404, "Product not found");
   }
+
+  await prisma.productCategory.deleteMany({ where: { productId: product.id } });
 
   const imagePath = path.join(UPLOAD_DIR, product.image);
 
@@ -105,7 +122,7 @@ const handleFileUpload = (file) => {
 };
 
 export const createProducts = asyncHandler(async (req, res) => {
-  const { title, description, price, categoryId } = req.body;
+  const { title, description, price, categoryIds } = req.body;
 
   validateText(title);
 
@@ -114,30 +131,40 @@ export const createProducts = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
-  if (!categoryId) {
-    throw new ApiError(400, "Category ID is required");
+  if (!categoryIds || !Array.isArray(categoryIds) || categoryIds.length === 0) {
+    throw new ApiError(400, "At least one category ID is required");
   }
 
-  const category = await prisma.category.findUnique({
-    where: { id: categoryId },
+  const categories = await prisma.category.findMany({
+    where: { id: { in: categoryIds } },
   });
-  if (!category) {
-    throw new ApiError(404, "Category not found");
+
+  if (categories.length !== categoryIds.length) {
+    throw new ApiError(404, "One or more categories not found");
   }
 
   const thumbnail = handleFileUpload(req.file);
 
   try {
     const slug = await generateUniqueSlug(null, title);
+    console.log(
+      categoryIds.map((categoryId) => ({
+        categoryId,
+      }))
+    );
     const products = await prisma.products.create({
       data: {
         title: title.toLowerCase().trim(),
         description: description.toLowerCase().trim(),
         price: parseFloat(price),
-        category_id: categoryId,
         image: thumbnail,
         slug,
         userId: req.user.id,
+        categories: {
+          create: categoryIds.map((categoryId) => ({
+            categoryId,
+          })),
+        },
       },
     });
 
@@ -156,7 +183,7 @@ export const createProducts = asyncHandler(async (req, res) => {
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
-  const { title, description, price } = req.body;
+  const { title, description, price, categoryIds } = req.body;
   const slug = req.params.slug;
 
   const updateFields = {};
@@ -202,7 +229,18 @@ export const updateProduct = asyncHandler(async (req, res) => {
   }
 
   try {
-    const updatedProduct = await update(slug, updateFields);
+    const updatedProduct = await prisma.products.update({
+      where: { slug },
+      data: {
+        ...updateFields,
+        ProductCategory: {
+          deleteMany: {},
+          create: categoryIds.map((categoryId) => ({
+            categoryId,
+          })),
+        },
+      },
+    });
 
     return res
       .status(200)
@@ -292,27 +330,6 @@ export const getAllProductsLength = asyncHandler(async (req, res) => {
         200,
         "Total products retrieved successfully",
         totalProducts
-      )
-    );
-});
-
-export const getAllProductsCategoriesLength = asyncHandler(async (req, res) => {
-  const categories = await prisma.products.findMany({
-    select: {
-      category: true,
-    },
-    distinct: ["category"],
-  });
-
-  const categoriesLength = categories.length;
-
-  return res
-    .status(200)
-    .json(
-      new ApiResponse(
-        200,
-        "Total categories retrieved successfully",
-        categoriesLength
       )
     );
 });

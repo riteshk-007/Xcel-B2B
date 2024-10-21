@@ -23,16 +23,15 @@ model User {
 }
 
 model Products {
-  id          String   @id @default(uuid())
+  id          String            @id @default(uuid())
   title       String
   description String
   price       Float
   image       String
-  slug        String   @unique
-  category_id String
-  category    Category @relation(fields: [category_id], references: [id])
+  slug        String            @unique
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  user        User              @relation(fields: [userId], references: [id])
+  categories  ProductCategory[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -41,13 +40,24 @@ model Products {
 }
 
 model Category {
-  id         String     @id @default(uuid())
-  name       String     @default("Uncategorized")
-  products   Products[]
-  created_at DateTime   @default(now())
-  updated_at DateTime   @updatedAt
+  id       String            @id @default(uuid())
+  name     String            @default("Uncategorized")
+  products ProductCategory[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   @@map("categories")
+}
+
+model ProductCategory {
+  productId  String
+  categoryId String
+  product    Products @relation(fields: [productId], references: [id])
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@id([productId, categoryId])
+  @@map("product_categories")
 }
 
 model Leads {

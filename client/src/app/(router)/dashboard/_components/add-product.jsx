@@ -22,7 +22,7 @@ export default function AddProductPage() {
   const [productName, setProductName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
+  const [categories, setCategories] = useState([]);
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [quillLoaded, setQuillLoaded] = useState(false);
@@ -49,8 +49,8 @@ export default function AddProductPage() {
     multiple: false,
   });
 
-  const handleCategoryChange = (selectedCategory) => {
-    setCategory(selectedCategory);
+  const handleCategoryChange = (selectedCategories) => {
+    setCategories(selectedCategories);
   };
 
   const handleSubmit = async (e) => {
@@ -63,11 +63,17 @@ export default function AddProductPage() {
       return;
     }
 
-    if (!productName || !price || !description || !category || !image) {
+    if (
+      !productName ||
+      !price ||
+      !description ||
+      categories.length === 0 ||
+      !image
+    ) {
       toast({
         title: "Error",
         description:
-          "Please fill in all fields, select a category, and upload an image.",
+          "Please fill in all fields, select at least one category, and upload an image.",
         variant: "destructive",
       });
       setLoading(false);
@@ -78,8 +84,10 @@ export default function AddProductPage() {
     formData.append("title", productName);
     formData.append("price", price);
     formData.append("description", description);
-    formData.append("categoryId", category);
     formData.append("image", image);
+    categories.forEach((category) =>
+      formData.append("categoryIds", category.id)
+    );
 
     try {
       const response = await axios.post(
@@ -89,6 +97,7 @@ export default function AddProductPage() {
           headers: { "Content-Type": "multipart/form-data" },
         }
       );
+      console.log(response);
       if (response.status === 201) {
         toast({
           title: "Success",
@@ -198,12 +207,7 @@ export default function AddProductPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Category</Label>
-                  <Categories
-                    onCategoryChange={handleCategoryChange}
-                    allowEdit={false}
-                    allowCreate={true}
-                    allowDelete={false}
-                  />
+                  <Categories onCategoryChange={handleCategoryChange} />
                 </div>
               </div>
             </div>
