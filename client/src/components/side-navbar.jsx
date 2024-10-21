@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, LogOut } from "lucide-react";
+import { Menu, LogOut, FolderKanban } from "lucide-react";
 
 import { LayoutDashboard, Package, Users } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -29,6 +29,11 @@ const navItems = [
     title: "Leads",
     href: "/dashboard/leads",
     icon: Users,
+  },
+  {
+    title: "Category Manage",
+    href: "/dashboard/category-manage",
+    icon: FolderKanban,
   },
 ];
 

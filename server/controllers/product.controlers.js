@@ -69,7 +69,15 @@ const findAll = async (page = 1, limit = 10) => {
 };
 
 const findOne = async (slug) => {
-  return await prisma.products.findUnique({ where: { slug } });
+  const result = await prisma.products.findUnique({
+    where: { slug },
+    include: { category: { select: { name: true } } },
+  });
+
+  if (!result) {
+    throw new ApiError(404, "Product not found");
+  }
+  return result;
 };
 
 const remove = async (slug) => {

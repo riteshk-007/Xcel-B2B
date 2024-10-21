@@ -44,7 +44,9 @@ export default function EditProductPage({ params }) {
         const response = await axios.get(
           `${process.env.NEXT_PUBLIC_API_URL}/product/${params.slug}`
         );
+
         const productData = response.data.data;
+
         setProductName(productData.title);
         setPrice(productData.price.toString());
         setDescription(productData.description);
@@ -149,6 +151,7 @@ export default function EditProductPage({ params }) {
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-64 w-full" />
               <Skeleton className="h-32 w-32 rounded-lg" />
+              <Skeleton className="h-48 w-full" />
             </div>
           </CardContent>
         </Card>
@@ -264,6 +267,17 @@ export default function EditProductPage({ params }) {
                     </div>
                   </div>
                 </div>
+                {/* <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Categories
+                    onCategoryChange={handleCategoryChange}
+                    allowEdit={true}
+                    allowCreate={true}
+                    allowDelete={true}
+                    allowSelect={true}
+                    initialSelectedCategory={category.id}
+                  />
+                </div> */}
               </div>
             </div>
           </form>

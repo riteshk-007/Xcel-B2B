@@ -2,51 +2,35 @@
 
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2, Trash2, Plus } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { useRouter } from "next/navigation";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2, Trash2, Plus, Edit, X, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "../../../../../context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
-export default function Categories({ onCategoryChange }) {
+export default function Categories({
+  onCategoryChange,
+  allowEdit = false,
+  allowCreate = false,
+  allowDelete = false,
+  allowSelect = true,
+  initialSelectedCategories = [],
+}) {
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState(
+    initialSelectedCategories
+  );
   const [newCategory, setNewCategory] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [creating, setCreating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editedName, setEditedName] = useState("");
 
   const { checkAuth } = useAuth();
-  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     loadCategories();
@@ -54,220 +38,269 @@ export default function Categories({ onCategoryChange }) {
 
   const loadCategories = async () => {
     setLoading(true);
-    setError(null);
     try {
       const isAuth = await checkAuth();
       if (!isAuth) {
-        router.push("/login");
+        window.location.href = "/login";
         return;
       }
       const response = await axios.get(
         `${process.env.NEXT_PUBLIC_API_URL}/category`
       );
-      setCategories(response.data.data);
+      setCategories(response.data.data || []);
     } catch (error) {
       console.error("Failed to load categories:", error);
-      setError("Failed to load categories. Please try again.");
+      toast({
+        title: "Error",
+        description: "Failed to load categories. Please try again.",
+        variant: "destructive",
+      });
+      setCategories([]);
     } finally {
       setLoading(false);
     }
   };
 
   const handleCategorySelect = (categoryId) => {
-    setSelectedCategory(categoryId);
+    if (categoryId === undefined || categoryId === null) return;
+
+    setSelectedCategories((prev) => {
+      const newSelection = prev.includes(categoryId)
+        ? prev.filter((id) => id !== categoryId)
+        : [...prev, categoryId];
+
+      if (onCategoryChange) {
+        const selectedCategoryObjects = categories.filter(
+          (c) => c && newSelection.includes(c.id)
+        );
+        onCategoryChange(selectedCategoryObjects);
+      }
+
+      return newSelection;
+    });
   };
 
   const handleCreateCategory = async () => {
     if (!newCategory.trim()) return;
-    setCreating(true);
     try {
-      const isAuth = await checkAuth();
-      if (!isAuth) {
-        router.push("/login");
-        return;
-      }
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/category`,
         { name: newCategory }
       );
-
-      setCategories([...categories, response.data.data]);
-
-      onCategoryChange(response.data.data.id);
-      setNewCategory("");
+      const newCategoryData = response.data.data;
+      if (newCategoryData && newCategoryData.id) {
+        setCategories([...categories, newCategoryData]);
+        setNewCategory("");
+        toast({
+          title: "Category Created",
+          description: `Category "${newCategoryData.name}" has been created successfully.`,
+        });
+      } else {
+        throw new Error("Invalid response data");
+      }
     } catch (error) {
       console.error("Failed to create category:", error);
-      setError("Failed to create category. Please try again.");
-    } finally {
-      setCreating(false);
+      toast({
+        title: "Error",
+        description: "Failed to create category. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
   const handleDeleteCategory = async (categoryId) => {
-    setDeleting(true);
+    if (categoryId === undefined || categoryId === null) return;
+
     try {
-      const isAuth = await checkAuth();
-      if (!isAuth) {
-        router.push("/login");
-        return;
-      }
       await axios.delete(
         `${process.env.NEXT_PUBLIC_API_URL}/category/${categoryId}`
       );
-      setCategories(categories.filter((c) => c.id !== categoryId));
-      if (selectedCategory === categoryId) {
-        setSelectedCategory("");
-      }
+      setCategories(categories.filter((c) => c && c.id !== categoryId));
+      setSelectedCategories((prev) => prev.filter((id) => id !== categoryId));
+      toast({
+        title: "Category Deleted",
+        description: "The category has been deleted successfully.",
+      });
     } catch (error) {
       console.error("Failed to delete category:", error);
-      setError("Failed to delete category. Please try again.");
-    } finally {
-      setDeleting(false);
+      toast({
+        title: "Error",
+        description: "Failed to delete category. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleConfirm = () => {
-    if (onCategoryChange) {
-      onCategoryChange(selectedCategory);
+  const handleEditCategory = (category) => {
+    if (category && category.id) {
+      setEditingCategory(category.id);
+      setEditedName(category.name || "");
     }
-    setDialogOpen(false);
+  };
+
+  const handleUpdateCategory = async () => {
+    if (editingCategory === null) return;
+
+    try {
+      const response = await axios.put(
+        `${process.env.NEXT_PUBLIC_API_URL}/category/${editingCategory}`,
+        { name: editedName }
+      );
+      const updatedCategory = response.data.data;
+      if (updatedCategory && updatedCategory?.id) {
+        setCategories(
+          categories.map((c) =>
+            c?.id === editingCategory ? updatedCategory : c
+          )
+        );
+        setEditingCategory(null);
+        toast({
+          title: "Category Updated",
+          description: `Category has been updated to "${updatedCategory.name}".`,
+        });
+      } else {
+        throw new Error("Invalid response data");
+      }
+    } catch (error) {
+      console.error("Failed to update category:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update category. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCategory(null);
+    setEditedName("");
   };
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-[200px]" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <AlertDialog open={!!error}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Error</AlertDialogTitle>
-            <AlertDialogDescription>{error}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setError(null)}>
-              OK
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <div className="flex items-center justify-center h-32">
+        <Loader2 className="animate-spin h-8 w-8" />
+      </div>
     );
   }
 
   return (
-    <Card>
+    <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle>Categories</CardTitle>
+        <CardTitle className="text-2xl font-bold">Categories</CardTitle>
       </CardHeader>
       <CardContent className="p-6">
         <div className="space-y-4">
-          <ScrollArea className="h-[200px] w-full rounded-md border p-4">
-            <RadioGroup
-              value={selectedCategory}
-              onValueChange={handleCategorySelect}
-              className="space-y-2"
-            >
-              {categories.map((category) => (
+          <div className="space-y-2">
+            {categories.map((category) => {
+              if (!category || !category.id) return null;
+              return (
                 <div
                   key={category.id}
-                  className="flex items-center justify-between space-x-2"
+                  className="flex items-center justify-between space-x-2 p-2 hover:bg-gray-100 rounded-md transition-colors"
                 >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value={category.id}
-                      id={`category-${category.id}`}
-                    />
-                    <Label htmlFor={`category-${category.id}`}>
-                      {category.name}
-                    </Label>
+                  <div className="flex items-center space-x-2 flex-grow">
+                    {allowSelect && (
+                      <Checkbox
+                        checked={selectedCategories.includes(category.id)}
+                        onCheckedChange={() =>
+                          handleCategorySelect(category.id)
+                        }
+                        id={`category-${category.id}`}
+                      />
+                    )}
+                    {editingCategory === category.id && allowEdit ? (
+                      <Input
+                        value={editedName}
+                        onChange={(e) => setEditedName(e.target.value)}
+                        className="w-full"
+                      />
+                    ) : (
+                      <Label
+                        htmlFor={`category-${category.id}`}
+                        className="flex-grow cursor-pointer"
+                      >
+                        {category.name}
+                      </Label>
+                    )}
                   </div>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="sm" disabled={deleting}>
+                  <div className="flex space-x-2">
+                    {allowEdit &&
+                      (editingCategory === category.id ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleUpdateCategory}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCancelEdit}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditCategory(category)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      ))}
+                    {allowDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteCategory(category.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently
-                          delete the category &quot;{category.name}&quot;.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDeleteCategory(category.id)}
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                    )}
+                  </div>
                 </div>
-              ))}
-            </RadioGroup>
-          </ScrollArea>
-          <div className="flex space-x-2">
-            <Input
-              type="text"
-              placeholder="New category name"
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-            />
-            <Button onClick={handleCreateCategory} disabled={creating}>
-              {creating ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="mr-2 h-4 w-4" />
-              )}
-              Create
-            </Button>
+              );
+            })}
           </div>
-          {selectedCategory && (
-            <Badge variant="secondary">
-              {categories.find((c) => c.id === selectedCategory)?.name}
-            </Badge>
-          )}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full" disabled={!selectedCategory}>
-                Confirm Selection
+          {allowCreate && (
+            <div className="flex space-x-2">
+              <Input
+                type="text"
+                placeholder="New category name"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                className="flex-grow"
+              />
+              <Button onClick={handleCreateCategory}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Confirm Selection</DialogTitle>
-                <DialogDescription>
-                  You have selected the following category:
-                </DialogDescription>
-              </DialogHeader>
-              {selectedCategory && (
-                <Badge variant="secondary" className="mt-2">
-                  {categories.find((c) => c.id === selectedCategory)?.name}
-                </Badge>
-              )}
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button onClick={handleConfirm}>Confirm</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            </div>
+          )}
+          {allowSelect && selectedCategories.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {selectedCategories.map((categoryId) => {
+                const category = categories.find(
+                  (c) => c && c.id === categoryId
+                );
+                return (
+                  category && (
+                    <Badge
+                      key={categoryId}
+                      variant="secondary"
+                      className="text-sm"
+                    >
+                      {category.name}
+                    </Badge>
+                  )
+                );
+              })}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

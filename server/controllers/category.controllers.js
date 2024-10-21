@@ -59,7 +59,7 @@ export const deleteCategory = asyncHandler(async (req, res) => {
 
 export const updateCategory = asyncHandler(async (req, res) => {
   const { name } = req.body;
-  const id = parseInt(req.params.id);
+  const id = req.params.id;
 
   const category = await prisma.category.findUnique({
     where: { id },
@@ -69,7 +69,7 @@ export const updateCategory = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Category not found");
   }
 
-  await prisma.category.update({
+  const data = await prisma.category.update({
     where: { id },
     data: {
       name: name.toLowerCase().trim(),
@@ -78,7 +78,7 @@ export const updateCategory = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "Category updated successfully"));
+    .json(new ApiResponse(200, "Category updated successfully", data));
 });
 
 export const getCategoriesLength = asyncHandler(async (req, res) => {

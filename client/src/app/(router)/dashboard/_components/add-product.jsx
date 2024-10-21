@@ -198,7 +198,12 @@ export default function AddProductPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Category</Label>
-                  <Categories onCategoryChange={handleCategoryChange} />
+                  <Categories
+                    onCategoryChange={handleCategoryChange}
+                    allowEdit={false}
+                    allowCreate={true}
+                    allowDelete={false}
+                  />
                 </div>
               </div>
             </div>
