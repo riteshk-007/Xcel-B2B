@@ -122,13 +122,17 @@ const handleFileUpload = (file) => {
 };
 
 export const createProducts = asyncHandler(async (req, res) => {
-  const { title, description, price, categoryIds } = req.body;
+  let { title, description, price, categoryIds } = req.body;
 
   validateText(title);
 
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
   if (!user) {
     throw new ApiError(404, "User not found");
+  }
+
+  if (typeof categoryIds === "string") {
+    categoryIds = [categoryIds];
   }
 
   if (!categoryIds || !Array.isArray(categoryIds) || categoryIds.length === 0) {
@@ -147,11 +151,6 @@ export const createProducts = asyncHandler(async (req, res) => {
 
   try {
     const slug = await generateUniqueSlug(null, title);
-    console.log(
-      categoryIds.map((categoryId) => ({
-        categoryId,
-      }))
-    );
     const products = await prisma.products.create({
       data: {
         title: title.toLowerCase().trim(),
@@ -228,14 +227,20 @@ export const updateProduct = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You are not authorized to update this product");
   }
 
+  // Ensure categoryIds is an array
+  let categoryIdsArray = categoryIds;
+  if (typeof categoryIds === "string") {
+    categoryIdsArray = [categoryIds];
+  }
+
   try {
     const updatedProduct = await prisma.products.update({
       where: { slug },
       data: {
         ...updateFields,
-        ProductCategory: {
+        categories: {
           deleteMany: {},
-          create: categoryIds.map((categoryId) => ({
+          create: categoryIdsArray.map((categoryId) => ({
             categoryId,
           })),
         },

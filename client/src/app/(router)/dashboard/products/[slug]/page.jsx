@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +13,10 @@ import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDropzone } from "react-dropzone";
 import Link from "next/link";
+
+import dynamic from "next/dynamic";
 import { useAuth } from "../../../../../../context/AuthContext";
+import Categories from "../../_components/Categories";
 
 const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
 
@@ -27,6 +29,7 @@ export default function EditProductPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const { toast } = useToast();
   const { checkAuth } = useAuth();
   const router = useRouter();
@@ -46,13 +49,13 @@ export default function EditProductPage({ params }) {
         );
 
         const productData = response.data.data;
-
         setProductName(productData.title);
         setPrice(productData.price.toString());
         setDescription(productData.description);
         setImagePreview(
           `${process.env.NEXT_PUBLIC_IMAGE_URL}/${productData.image}`
         );
+        setSelectedCategories(productData.categories.map((c) => c.categoryId));
       } catch (error) {
         console.error("Failed to load product data:", error);
         setError("Failed to load product data. Please try again.");
@@ -79,6 +82,11 @@ export default function EditProductPage({ params }) {
     multiple: false,
   });
 
+  const handleCategoryChange = (selectedIds) => {
+    if (selectedIds === undefined || selectedIds === null) return;
+    setSelectedCategories(selectedIds);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setUpdating(true);
@@ -90,10 +98,16 @@ export default function EditProductPage({ params }) {
       return;
     }
 
-    if (!productName || !price || !description) {
+    if (
+      !productName ||
+      !price ||
+      !description ||
+      selectedCategories.length === 0
+    ) {
       toast({
         title: "Error",
-        description: "Please fill in all fields.",
+        description:
+          "Please fill in all fields and select at least one category.",
         variant: "destructive",
       });
       setUpdating(false);
@@ -104,10 +118,12 @@ export default function EditProductPage({ params }) {
     formData.append("title", productName);
     formData.append("price", price);
     formData.append("description", description);
+    selectedCategories.forEach((categoryId) => {
+      formData.append("categoryIds", categoryId);
+    });
     if (image) {
       formData.append("image", image);
     }
-
     try {
       const response = await axios.put(
         `${process.env.NEXT_PUBLIC_API_URL}/product/${params.slug}`,
@@ -267,17 +283,14 @@ export default function EditProductPage({ params }) {
                     </div>
                   </div>
                 </div>
-                {/* <div className="space-y-2">
+                <div className="space-y-2">
                   <Label>Category</Label>
                   <Categories
                     onCategoryChange={handleCategoryChange}
-                    allowEdit={true}
-                    allowCreate={true}
-                    allowDelete={true}
                     allowSelect={true}
-                    initialSelectedCategory={category.id}
+                    initialSelectedCategories={selectedCategories}
                   />
-                </div> */}
+                </div>
               </div>
             </div>
           </form>

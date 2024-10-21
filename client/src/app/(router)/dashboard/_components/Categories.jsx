@@ -11,6 +11,7 @@ import { Loader2, Trash2, Plus, Edit, X, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "../../../../../context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Categories({
   onCategoryChange,
@@ -191,7 +192,7 @@ export default function Categories({
       </CardHeader>
       <CardContent className="p-6">
         <div className="space-y-4">
-          <div className="space-y-2">
+          <ScrollArea className="space-y-2 h-72">
             {categories.map((category) => {
               if (!category || !category.id) return null;
               return (
@@ -265,7 +266,7 @@ export default function Categories({
                 </div>
               );
             })}
-          </div>
+          </ScrollArea>
           {allowCreate && (
             <div className="flex space-x-2">
               <Input
