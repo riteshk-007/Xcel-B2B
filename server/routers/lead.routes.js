@@ -4,6 +4,7 @@ import {
   deleteLead,
   getAllLeads,
   getLeadsLength,
+  getLeadsLengthAndDate,
   getOneLead,
   recentLeads,
   searchLeads,
@@ -24,6 +25,7 @@ router
 
 router.get("/recent", verifyJWTToken, recentLeads);
 router.get("/leads-length", verifyJWTToken, getLeadsLength);
+router.get("/length-date", verifyJWTToken, getLeadsLengthAndDate);
 
 // Specific lead routes
 router

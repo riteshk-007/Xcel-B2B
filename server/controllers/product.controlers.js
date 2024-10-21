@@ -338,3 +338,26 @@ export const getAllProductsLength = asyncHandler(async (req, res) => {
       )
     );
 });
+
+export const getAllProductsLengthAndDate = asyncHandler(async (req, res) => {
+  const totalProducts = await prisma.products.count();
+  const products = await prisma.products.findMany({
+    select: {
+      created_at: true,
+    },
+  });
+
+  const creationDates = products.map((product) =>
+    product.created_at.toDateString()
+  );
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Total products and creation dates retrieved successfully",
+        { totalProducts, creationDates }
+      )
+    );
+});

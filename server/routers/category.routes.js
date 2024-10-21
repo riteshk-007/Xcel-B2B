@@ -6,11 +6,13 @@ import {
   getAllCategories,
   updateCategory,
   getCategoriesLength,
+  getCategoriesLengthAndDate,
 } from "../controllers/category.controllers.js";
 
 const router = Router();
 
 router.route("/length").get(verifyJWTToken, getCategoriesLength);
+router.route("/length-date").get(verifyJWTToken, getCategoriesLengthAndDate);
 
 // http://localhost:4000/api/v1/category
 router

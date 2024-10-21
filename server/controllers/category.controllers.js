@@ -94,3 +94,26 @@ export const getCategoriesLength = asyncHandler(async (req, res) => {
       )
     );
 });
+
+export const getCategoriesLengthAndDate = asyncHandler(async (req, res) => {
+  const totalCategories = await prisma.category.count();
+  const categories = await prisma.category.findMany({
+    select: {
+      created_at: true,
+    },
+  });
+
+  const creationDates = categories.map((category) =>
+    category.created_at.toDateString()
+  );
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Total categories and creation dates retrieved successfully",
+        { totalCategories, creationDates }
+      )
+    );
+});

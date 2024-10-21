@@ -6,7 +6,6 @@ import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, Users, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "../../../../context/AuthContext";
 import { StatCard } from "./_components/StatCard";
 import { LeadItem } from "./_components/LeadItem";
 import {
@@ -17,18 +16,32 @@ import {
   YAxis,
   Bar,
   BarChart,
+  Tooltip,
 } from "recharts";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
+import { useAuth } from "../../../../context/AuthContext";
 
 const INITIAL_DASHBOARD_DATA = {
   recentLeads: [],
   stats: { products: 0, categories: 0, leads: 0 },
-  loading: { recentLeads: true, products: true, categories: true, leads: true },
-  error: { recentLeads: null, products: null, categories: null, leads: null },
+  chartData: { products: [], categories: [], leads: [] },
+  loading: {
+    recentLeads: true,
+    products: true,
+    categories: true,
+    leads: true,
+    productsChart: true,
+    categoriesChart: true,
+    leadsChart: true,
+  },
+  error: {
+    recentLeads: null,
+    products: null,
+    categories: null,
+    leads: null,
+    productsChart: null,
+    categoriesChart: null,
+    leadsChart: null,
+  },
 };
 
 const STAT_CARDS = [
@@ -66,6 +79,9 @@ export default function Dashboard() {
       { key: "products", func: fetchProductsLength },
       { key: "categories", func: fetchCategoriesLength },
       { key: "leads", func: fetchLeadsLength },
+      { key: "productsChart", func: fetchProductsChart },
+      { key: "categoriesChart", func: fetchCategoriesChart },
+      { key: "leadsChart", func: fetchLeadsChart },
     ];
 
     fetchFunctions.forEach(({ key, func }) => func(key));
@@ -84,8 +100,12 @@ export default function Dashboard() {
         ...prev.error,
         [key]: isError ? `Failed to fetch ${key}` : null,
       },
-      ...(key !== "recentLeads" && {
-        stats: { ...prev.stats, [key]: isError ? 0 : data },
+      ...(key !== "recentLeads" &&
+        !key.includes("Chart") && {
+          stats: { ...prev.stats, [key]: isError ? 0 : data },
+        }),
+      ...(key.includes("Chart") && {
+        chartData: { ...prev.chartData, [key.replace("Chart", "")]: data },
       }),
     }));
   };
@@ -111,23 +131,37 @@ export default function Dashboard() {
   const fetchCategoriesLength = () =>
     fetchData("categories", "/category/length");
   const fetchLeadsLength = () => fetchData("leads", "/leads/leads-length");
+  const fetchProductsChart = () =>
+    fetchData("productsChart", "/product/length-date");
+  const fetchCategoriesChart = () =>
+    fetchData("categoriesChart", "/category/length-date");
+  const fetchLeadsChart = () => fetchData("leadsChart", "/leads/length-date");
 
-  const { recentLeads, stats, loading, error } = dashboardData;
+  const { recentLeads, stats, chartData, loading, error } = dashboardData;
 
-  const chartData = [
-    { name: "Products", value: stats.products },
-    { name: "Categories", value: stats.categories },
-    { name: "Leads", value: stats.leads },
-  ];
+  const formatChartData = (data) => {
+    if (!data || !data.creationDates) return [];
+    return data.creationDates.map((date, index) => ({
+      date: new Date(date).toLocaleDateString(),
+      count: index + 1,
+    }));
+  };
 
-  const lineChartData = recentLeads.map((lead, index) => ({
-    date: new Date(lead.createdAt).toLocaleDateString(),
-    leads: index + 1,
-    products: Math.floor(stats.products * ((index + 1) / recentLeads.length)),
-    categories: Math.floor(
-      stats.categories * ((index + 1) / recentLeads.length)
-    ),
-  }));
+  const combinedChartData = [
+    ...(formatChartData(chartData.products) || []),
+    ...(formatChartData(chartData.categories) || []),
+    ...(formatChartData(chartData.leads) || []),
+  ].reduce((acc, curr) => {
+    const existingEntry = acc.find((item) => item.date === curr.date);
+    if (existingEntry) {
+      existingEntry.count += curr.count;
+    } else {
+      acc.push(curr);
+    }
+    return acc;
+  }, []);
+
+  combinedChartData.sort((a, b) => new Date(a.date) - new Date(b.date));
 
   return (
     <div className="flex-1 space-y-4 p-4 sm:p-6 md:p-8">
@@ -142,7 +176,7 @@ export default function Dashboard() {
             title={title}
             value={
               loading[key] ? (
-                <Skeleton className="h-8 w-20 bg-gray-300" />
+                <Skeleton className="h-8 w-20" />
               ) : error[key] ? (
                 <span className="text-red-500">Error</span>
               ) : (
@@ -160,46 +194,26 @@ export default function Dashboard() {
             <CardTitle>Overview (Bar Chart)</CardTitle>
           </CardHeader>
           <CardContent className="p-2 sm:p-4">
-            {loading.recentLeads ||
-            loading.products ||
-            loading.categories ||
-            loading.leads ? (
-              <Skeleton className="h-[200px] sm:h-[250px] md:h-[300px] w-full bg-gray-300" />
-            ) : error.recentLeads ||
-              error.products ||
-              error.categories ||
-              error.leads ? (
+            {loading.products || loading.categories || loading.leads ? (
+              <Skeleton className="h-[200px] sm:h-[250px] md:h-[300px] w-full" />
+            ) : error.products || error.categories || error.leads ? (
               <p className="text-red-500">Error loading data</p>
             ) : (
-              <ChartContainer
-                config={{
-                  products: {
-                    label: "Products",
-                    color: "hsl(var(--chart-1))",
-                  },
-                  categories: {
-                    label: "Categories",
-                    color: "hsl(var(--chart-2))",
-                  },
-                  leads: {
-                    label: "Leads",
-                    color: "hsl(var(--chart-3))",
-                  },
-                }}
-                className="h-[200px] sm:h-[250px] md:h-[300px] w-full"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={chartData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="value" fill="var(--color-products)" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={[
+                    { name: "Products", value: stats.products },
+                    { name: "Categories", value: stats.categories },
+                    { name: "Leads", value: stats.leads },
+                  ]}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#8884d8" />
+                </BarChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
@@ -209,63 +223,31 @@ export default function Dashboard() {
             <CardTitle>Trend Over Time (Line Chart)</CardTitle>
           </CardHeader>
           <CardContent className="p-2 sm:p-4">
-            {loading.recentLeads ||
-            loading.products ||
-            loading.categories ||
-            loading.leads ? (
-              <Skeleton className="h-[200px] sm:h-[250px] md:h-[300px] w-full bg-gray-300" />
-            ) : error.recentLeads ||
-              error.products ||
-              error.categories ||
-              error.leads ? (
+            {loading.productsChart ||
+            loading.categoriesChart ||
+            loading.leadsChart ? (
+              <Skeleton className="h-[200px] sm:h-[250px] md:h-[300px] w-full" />
+            ) : error.productsChart ||
+              error.categoriesChart ||
+              error.leadsChart ? (
               <p className="text-red-500">Error loading data</p>
             ) : (
-              <ChartContainer
-                config={{
-                  products: {
-                    label: "Products",
-                    color: "hsl(var(--chart-1))",
-                  },
-                  categories: {
-                    label: "Categories",
-                    color: "hsl(var(--chart-2))",
-                  },
-                  leads: {
-                    label: "Leads",
-                    color: "hsl(var(--chart-3))",
-                  },
-                }}
-                className="h-[200px] sm:h-[250px] md:h-[300px] w-full"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={lineChartData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Line
-                      type="monotone"
-                      dataKey="products"
-                      stroke="var(--color-products)"
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="categories"
-                      stroke="var(--color-categories)"
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="leads"
-                      stroke="var(--color-leads)"
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart
+                  data={combinedChartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="hsl(var(--chart-1))"
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
@@ -279,10 +261,7 @@ export default function Dashboard() {
           {loading.recentLeads ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, index) => (
-                <Skeleton
-                  key={index}
-                  className="h-16 sm:h-20 w-full bg-gray-300"
-                />
+                <Skeleton key={index} className="h-16 sm:h-20 w-full" />
               ))}
             </div>
           ) : error.recentLeads ? (

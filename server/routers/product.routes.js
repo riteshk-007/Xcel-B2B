@@ -8,6 +8,7 @@ import {
   searchProducts,
   updateProduct,
   getAllProductsLength,
+  getAllProductsLengthAndDate,
 } from "../controllers/product.controlers.js";
 import { compressImage, upload } from "../middlewares/multer.middleware.js";
 
@@ -18,6 +19,7 @@ router.route("/search").get(verifyJWTToken, searchProducts);
 
 // http://localhost:4000/api/v1/product/length
 router.route("/product-length").get(verifyJWTToken, getAllProductsLength);
+router.route("/length-date").get(verifyJWTToken, getAllProductsLengthAndDate);
 
 // http://localhost:4000/api/v1/product?page=1&limit=10
 router

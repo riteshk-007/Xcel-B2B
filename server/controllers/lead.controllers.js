@@ -250,3 +250,24 @@ export const getLeadsLength = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, "Total leads retrieved successfully", leads));
 });
+export const getLeadsLengthAndDate = asyncHandler(async (req, res) => {
+  const leadsCount = await prisma.leads.count();
+  const leads = await prisma.leads.findMany({
+    select: {
+      created_at: true,
+    },
+  });
+
+  const creationDates = leads.map((lead) => lead.created_at.toDateString());
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      "Total leads and creation dates retrieved successfully",
+      {
+        leadsCount,
+        creationDates,
+      }
+    )
+  );
+});
