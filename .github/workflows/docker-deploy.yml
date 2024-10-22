@@ -1,0 +1,25 @@
+# .github/workflows/docker-deploy.yml
+name: Docker Deploy to EC2
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: SSH and deploy
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ec2-user
+        run: |
+          echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
+          ssh -o StrictHostKeyChecking=no -i private_key ${USER}@${HOST} '
+            cd /path/to/your/repo &&
+            git pull &&
+            docker-compose down &&
+            docker-compose build --no-cache &&
+            docker-compose up -d
+          '
