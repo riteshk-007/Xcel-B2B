@@ -213,6 +213,18 @@ export function LeadCard({ lead, onStatusChange, onDelete }) {
     }
   };
 
+  const formatDate = (dateString) => {
+    const options = {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: true,
+    };
+    return new Date(dateString).toLocaleString(undefined, options);
+  };
+
   return (
     <Card className="w-full shadow-lg hover:shadow-xl transition-shadow duration-300">
       <CardHeader className={`${getHeaderColor(type)} text-white rounded-t-lg`}>
@@ -320,6 +332,12 @@ export function LeadCard({ lead, onStatusChange, onDelete }) {
                   ) : (
                     <>
                       <p className="text-foreground">{comment.message}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Created at: {formatDate(comment.created_at)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Updated at: {formatDate(comment.updated_at)}
+                      </p>
                       <div className="flex justify-end space-x-2 mt-2">
                         <Button
                           variant="outline"
