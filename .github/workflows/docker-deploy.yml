@@ -18,9 +18,12 @@ jobs:
         run: |
           echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
           ssh -o StrictHostKeyChecking=no -i private_key ${USER}@${HOST} '
+            # Reload shell to ensure docker group is loaded
+            source ~/.bashrc &&
             cd /home/ec2-user/app &&
             git pull &&
-            docker-compose down &&
-            docker-compose build --no-cache &&
-            docker-compose up -d
+            # Use full path for docker-compose
+            /usr/local/bin/docker-compose down &&
+            /usr/local/bin/docker-compose build --no-cache &&
+            /usr/local/bin/docker-compose up -d
           '
