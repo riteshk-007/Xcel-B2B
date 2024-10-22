@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDropzone } from "react-dropzone";
 import Link from "next/link";
-
 import dynamic from "next/dynamic";
 import { useAuth } from "../../../../../../context/AuthContext";
 import Categories from "../../_components/Categories";
@@ -21,6 +20,7 @@ import Categories from "../../_components/Categories";
 const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
 
 export default function EditProductPage({ params }) {
+  const [originalData, setOriginalData] = useState(null);
   const [productName, setProductName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
@@ -34,47 +34,48 @@ export default function EditProductPage({ params }) {
   const { checkAuth } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    const loadProductData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const isAuth = await checkAuth();
-        if (!isAuth) {
-          router.push("/login");
-          return;
-        }
-        const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/product/${params.slug}`
-        );
-
-        const productData = response.data.data;
-        setProductName(productData.title);
-        setPrice(productData.price.toString());
-        setDescription(productData.description);
-        setImagePreview(
-          `${process.env.NEXT_PUBLIC_IMAGE_URL}/${productData.image}`
-        );
-        setSelectedCategories(productData.categories.map((c) => c.categoryId));
-      } catch (error) {
-        console.error("Failed to load product data:", error);
-        setError("Failed to load product data. Please try again.");
-      } finally {
-        setLoading(false);
+  const loadProductData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const isAuth = await checkAuth();
+      if (!isAuth) {
+        router.push("/login");
+        return;
       }
-    };
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/product/${params.slug}`
+      );
 
-    loadProductData();
-    import("react-quill/dist/quill.snow.css");
+      const productData = response.data.data;
+      setOriginalData(productData);
+      setProductName(productData.title);
+      setPrice(productData.price.toString());
+      setDescription(productData.description);
+      setImagePreview(
+        `${process.env.NEXT_PUBLIC_IMAGE_URL}/${productData.image}`
+      );
+      setSelectedCategories(productData.categories.map((c) => c.categoryId));
+    } catch (error) {
+      console.error("Failed to load product data:", error);
+      setError("Failed to load product data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }, [params.slug, checkAuth, router]);
 
-  const onDrop = (acceptedFiles) => {
+  useEffect(() => {
+    loadProductData();
+    import("react-quill/dist/quill.snow.css");
+  }, [loadProductData]);
+
+  const onDrop = useCallback((acceptedFiles) => {
     const file = acceptedFiles[0];
     if (file) {
       setImage(file);
       setImagePreview(URL.createObjectURL(file));
     }
-  };
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -82,13 +83,34 @@ export default function EditProductPage({ params }) {
     multiple: false,
   });
 
-  const handleCategoryChange = (selectedIds) => {
+  const handleCategoryChange = useCallback((selectedIds) => {
     if (selectedIds === undefined || selectedIds === null) return;
     setSelectedCategories(selectedIds);
-  };
+  }, []);
+
+  const hasChanges = useCallback(() => {
+    if (!originalData) return false;
+    return (
+      productName !== originalData.title ||
+      price !== originalData.price.toString() ||
+      description !== originalData.description ||
+      image !== null ||
+      JSON.stringify(selectedCategories) !==
+        JSON.stringify(originalData.categories.map((c) => c.categoryId))
+    );
+  }, [
+    originalData,
+    productName,
+    price,
+    description,
+    image,
+    selectedCategories,
+  ]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!hasChanges()) return;
+
     setUpdating(true);
     setError(null);
 
@@ -98,32 +120,25 @@ export default function EditProductPage({ params }) {
       return;
     }
 
-    if (
-      !productName ||
-      !price ||
-      !description ||
-      selectedCategories.length === 0
-    ) {
-      toast({
-        title: "Error",
-        description:
-          "Please fill in all fields and select at least one category.",
-        variant: "destructive",
-      });
-      setUpdating(false);
-      return;
-    }
-
     const formData = new FormData();
-    formData.append("title", productName);
-    formData.append("price", price);
-    formData.append("description", description);
-    selectedCategories.forEach((categoryId) => {
-      formData.append("categoryIds", categoryId);
-    });
+    if (productName !== originalData.title)
+      formData.append("title", productName);
+    if (price !== originalData.price.toString())
+      formData.append("price", price);
+    if (description !== originalData.description)
+      formData.append("description", description);
+    if (
+      JSON.stringify(selectedCategories) !==
+      JSON.stringify(originalData.categories.map((c) => c.categoryId))
+    ) {
+      selectedCategories.forEach((categoryId) => {
+        formData.append("categoryIds", categoryId.id);
+      });
+    }
     if (image) {
       formData.append("image", image);
     }
+
     try {
       const response = await axios.put(
         `${process.env.NEXT_PUBLIC_API_URL}/product/${params.slug}`,
@@ -145,10 +160,14 @@ export default function EditProductPage({ params }) {
       }
     } catch (error) {
       console.error("Error updating product:", error);
-      setError("Failed to update product. Please try again.");
+      setError(
+        error.response?.data?.message ||
+          "Failed to update product. Please try again."
+      );
       toast({
         title: "Error",
-        description: "Failed to update product",
+        description:
+          error.response?.data?.message || "Failed to update product",
         variant: "destructive",
       });
     } finally {
@@ -206,7 +225,11 @@ export default function EditProductPage({ params }) {
                 Back
               </Link>
             </Button>
-            <Button type="submit" form="edit-product-form" disabled={updating}>
+            <Button
+              type="submit"
+              form="edit-product-form"
+              disabled={updating || !hasChanges()}
+            >
               {updating ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}

@@ -185,40 +185,11 @@ export const updateProduct = asyncHandler(async (req, res) => {
   const { title, description, price, categoryIds } = req.body;
   const slug = req.params.slug;
 
-  const updateFields = {};
+  const product = await prisma.products.findUnique({
+    where: { slug },
+    include: { categories: true },
+  });
 
-  if (title) {
-    validateText(title);
-    updateFields.title = title.toLowerCase().trim();
-    updateFields.slug = await generateUniqueSlug(null, title);
-  }
-  if (description) {
-    validateText(description);
-    updateFields.description = description.toLowerCase().trim();
-  }
-  if (price) {
-    updateFields.price = parseFloat(price);
-  }
-
-  if (req.file) {
-    const product = await findOne(slug);
-    if (!product) {
-      throw new ApiError(404, "Product not found");
-    }
-
-    // Delete the old image
-    const oldImagePath = path.join(UPLOAD_DIR, product.image);
-    try {
-      await fs.unlink(oldImagePath);
-    } catch (error) {
-      console.error("Failed to delete old image", error);
-    }
-
-    // Handle new image upload
-    updateFields.image = handleFileUpload(req.file);
-  }
-
-  const product = await findOne(slug);
   if (!product) {
     throw new ApiError(404, "Product not found");
   }
@@ -227,10 +198,57 @@ export const updateProduct = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You are not authorized to update this product");
   }
 
-  // Ensure categoryIds is an array
-  let categoryIdsArray = categoryIds;
-  if (typeof categoryIds === "string") {
-    categoryIdsArray = [categoryIds];
+  const updateFields = {};
+
+  if (title && title !== product.title) {
+    validateText(title);
+    updateFields.title = title.toLowerCase().trim();
+    updateFields.slug = await generateUniqueSlug(null, title);
+  }
+
+  if (description && description !== product.description) {
+    validateText(description);
+    updateFields.description = description.toLowerCase().trim();
+  }
+
+  if (price && parseFloat(price) !== product.price) {
+    updateFields.price = parseFloat(price);
+  }
+
+  if (req.file) {
+    if (product.image) {
+      const oldImagePath = path.join(UPLOAD_DIR, product.image);
+      try {
+        await fs.unlink(oldImagePath);
+      } catch (error) {
+        console.error("Failed to delete old image", error);
+      }
+    }
+
+    updateFields.image = handleFileUpload(req.file);
+  }
+
+  // Handle category updates
+  let categoryUpdate = {};
+  if (categoryIds) {
+    const categoryIdsArray = Array.isArray(categoryIds)
+      ? categoryIds
+      : [categoryIds];
+    const currentCategoryIds = product.categories.map((c) => c.categoryId);
+
+    if (
+      JSON.stringify(categoryIdsArray.sort()) !==
+      JSON.stringify(currentCategoryIds.sort())
+    ) {
+      categoryUpdate = {
+        categories: {
+          deleteMany: {},
+          create: categoryIdsArray.map((categoryId) => ({
+            categoryId: categoryId,
+          })),
+        },
+      };
+    }
   }
 
   try {
@@ -238,11 +256,13 @@ export const updateProduct = asyncHandler(async (req, res) => {
       where: { slug },
       data: {
         ...updateFields,
+        ...(Object.keys(categoryUpdate).length > 0 ? categoryUpdate : {}),
+      },
+      include: {
         categories: {
-          deleteMany: {},
-          create: categoryIdsArray.map((categoryId) => ({
-            categoryId,
-          })),
+          include: {
+            category: true,
+          },
         },
       },
     });
@@ -253,7 +273,8 @@ export const updateProduct = asyncHandler(async (req, res) => {
         new ApiResponse(200, "Product updated successfully", updatedProduct)
       );
   } catch (error) {
-    throw new ApiError(500, "Failed to update product");
+    console.error("Error updating product:", error);
+    throw new ApiError(500, `Failed to update product: ${error.message}`);
   }
 });
 
