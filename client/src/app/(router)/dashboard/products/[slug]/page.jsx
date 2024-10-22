@@ -40,7 +40,7 @@ export default function EditProductPage({ params }) {
     try {
       const isAuth = await checkAuth();
       if (!isAuth) {
-        router.push("/login");
+        router.push("/");
         return;
       }
       const response = await axios.get(
@@ -116,7 +116,7 @@ export default function EditProductPage({ params }) {
 
     const isAuth = await checkAuth();
     if (!isAuth) {
-      router.push("/login");
+      router.push("/");
       return;
     }
 

@@ -59,7 +59,7 @@ export default function AddProductPage() {
 
     const isAuth = await checkAuth();
     if (!isAuth) {
-      router.push("/login");
+      router.push("/");
       return;
     }
 

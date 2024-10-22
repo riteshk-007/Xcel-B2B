@@ -4,7 +4,13 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, Users, FileText } from "lucide-react";
+import {
+  Package,
+  Users,
+  FileText,
+  BarChart as BarChartIcon,
+  LineChart as LineChartIcon,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "./_components/StatCard";
 import { LeadItem } from "./_components/LeadItem";
@@ -16,8 +22,14 @@ import {
   YAxis,
   Bar,
   BarChart,
-  Tooltip,
+  CartesianGrid,
+  Legend,
 } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import { useAuth } from "../../../../context/AuthContext";
 
 const INITIAL_DASHBOARD_DATA = {
@@ -147,29 +159,24 @@ export default function Dashboard() {
     }));
   };
 
-  const combinedChartData = [
-    ...(formatChartData(chartData.products) || []),
-    ...(formatChartData(chartData.categories) || []),
-    ...(formatChartData(chartData.leads) || []),
-  ].reduce((acc, curr) => {
-    const existingEntry = acc.find((item) => item.date === curr.date);
-    if (existingEntry) {
-      existingEntry.count += curr.count;
-    } else {
-      acc.push(curr);
-    }
-    return acc;
-  }, []);
+  const productsData = formatChartData(chartData.products);
+  const categoriesData = formatChartData(chartData.categories);
+  const leadsData = formatChartData(chartData.leads);
 
-  combinedChartData.sort((a, b) => new Date(a.date) - new Date(b.date));
+  const combinedChartData = productsData.map((item) => ({
+    date: item.date,
+    products: item.count,
+    categories: categoriesData.find((c) => c.date === item.date)?.count || 0,
+    leads: leadsData.find((l) => l.date === item.date)?.count || 0,
+  }));
 
   return (
-    <div className="flex-1 space-y-4 p-4 sm:p-6 md:p-8">
-      <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+    <div className="flex-1 space-y-6 p-6 md:p-8 lg:p-10">
+      <h1 className="text-3xl font-bold tracking-tight text-primary">
         Dashboard
-      </h2>
+      </h1>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {STAT_CARDS.map(({ key, title, icon }) => (
           <StatCard
             key={key}
@@ -178,7 +185,7 @@ export default function Dashboard() {
               loading[key] ? (
                 <Skeleton className="h-8 w-20" />
               ) : error[key] ? (
-                <span className="text-red-500">Error</span>
+                <span className="text-destructive">Error</span>
               ) : (
                 stats[key]
               )
@@ -188,88 +195,147 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Overview (Bar Chart)</CardTitle>
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Overview</CardTitle>
+            <BarChartIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="p-2 sm:p-4">
+          <CardContent>
             {loading.products || loading.categories || loading.leads ? (
-              <Skeleton className="h-[200px] sm:h-[250px] md:h-[300px] w-full" />
+              <Skeleton className="h-[300px] w-full" />
             ) : error.products || error.categories || error.leads ? (
-              <p className="text-red-500">Error loading data</p>
+              <p className="text-destructive">Error loading data</p>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={[
-                    { name: "Products", value: stats.products },
-                    { name: "Categories", value: stats.categories },
-                    { name: "Leads", value: stats.leads },
-                  ]}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#8884d8" />
-                </BarChart>
-              </ResponsiveContainer>
+              <ChartContainer
+                config={{
+                  products: {
+                    label: "Products",
+                    color: "hsl(var(--chart-1))",
+                  },
+                  categories: {
+                    label: "Categories",
+                    color: "hsl(var(--chart-2))",
+                  },
+                  leads: {
+                    label: "Leads",
+                    color: "hsl(var(--chart-3))",
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={[
+                      { name: "Products", value: stats.products },
+                      { name: "Categories", value: stats.categories },
+                      { name: "Leads", value: stats.leads },
+                    ]}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="value" fill="var(--color-products)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
             )}
           </CardContent>
         </Card>
 
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Trend Over Time (Line Chart)</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Trend Over Time
+            </CardTitle>
+            <LineChartIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="p-2 sm:p-4">
+          <CardContent>
             {loading.productsChart ||
             loading.categoriesChart ||
             loading.leadsChart ? (
-              <Skeleton className="h-[200px] sm:h-[250px] md:h-[300px] w-full" />
+              <Skeleton className="h-[300px] w-full" />
             ) : error.productsChart ||
               error.categoriesChart ||
               error.leadsChart ? (
-              <p className="text-red-500">Error loading data</p>
+              <p className="text-destructive">Error loading data</p>
             ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart
-                  data={combinedChartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="count"
-                    stroke="hsl(var(--chart-1))"
-                    strokeWidth={2}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <ChartContainer
+                config={{
+                  products: {
+                    label: "Products",
+                    color: "hsl(var(--chart-1))",
+                  },
+                  categories: {
+                    label: "Categories",
+                    color: "hsl(var(--chart-2))",
+                  },
+                  leads: {
+                    label: "Leads",
+                    color: "hsl(var(--chart-3))",
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={combinedChartData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="products"
+                      stroke="var(--color-products)"
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="categories"
+                      stroke="var(--color-categories)"
+                      strokeWidth={2}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="leads"
+                      stroke="var(--color-leads)"
+                      strokeWidth={2}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <Card className="col-span-1 lg:col-span-2">
+      <Card>
         <CardHeader>
           <CardTitle>Recent Leads</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           {loading.recentLeads ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, index) => (
-                <Skeleton key={index} className="h-16 sm:h-20 w-full" />
+                <Skeleton key={index} className="h-20 w-full" />
               ))}
             </div>
           ) : error.recentLeads ? (
-            <p className="text-red-500">{error.recentLeads}</p>
+            <p className="text-destructive">{error.recentLeads}</p>
           ) : recentLeads.length > 0 ? (
-            recentLeads.map((item, index) => <LeadItem key={index} {...item} />)
+            <div className="space-y-4">
+              {recentLeads.map((item, index) => (
+                <LeadItem key={index} {...item} />
+              ))}
+            </div>
           ) : (
-            <p>No recent leads available.</p>
+            <p className="text-muted-foreground">No recent leads available.</p>
           )}
         </CardContent>
       </Card>
