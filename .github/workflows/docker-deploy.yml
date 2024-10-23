@@ -24,6 +24,5 @@ jobs:
             git pull &&
             # Use full path for docker-compose
             /usr/local/bin/docker-compose down &&
-            /usr/local/bin/docker-compose build --no-cache &&
-            /usr/local/bin/docker-compose up -d
+            /usr/local/bin/docker-compose up -d --build
           '
