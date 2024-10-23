@@ -7,6 +7,5 @@ RUN npm install
 COPY . .
 
 RUN npx prisma generate
-RUN npx prisma db push
 
 CMD ["npm", "start"]
