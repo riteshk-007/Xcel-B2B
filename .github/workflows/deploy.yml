@@ -9,11 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-          repository: riteshk-007/Xcel-B2B
+      - uses: actions/checkout@v2
 
       - name: Create ecosystem.config.js
         run: |
@@ -53,8 +49,6 @@ jobs:
 
             # Clear Git cache and pull changes
             echo "Fetching latest changes..."
-            git config --global credential.helper store
-            echo "https://${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
             git checkout main
             git fetch origin main
             git reset --hard origin/main
