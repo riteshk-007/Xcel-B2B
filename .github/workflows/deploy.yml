@@ -9,12 +9,24 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "18"
+      - name: Create ecosystem.config.js
+        run: |
+          echo "module.exports = { 
+            apps: [
+              { 
+                name: 'backend',
+                script: 'index.js',
+                env: { 
+                  PORT: 4000,
+                  CORS_ORIGIN: '${{ secrets.CORS_ORIGIN }}',
+                  ACCESS_JWT_SECRET: '${{ secrets.ACCESS_JWT_SECRET }}',
+                  DATABASE_URL: '${{ secrets.DATABASE_URL }}'
+                }
+              }
+            ]
+          }" > server/ecosystem.config.js
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
@@ -22,37 +34,36 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
-          script_stop: true
-          command_timeout: "30m"
-          envs: GITHUB_SHA
+          command_timeout: "20m"
           script: |
             # Navigate to project directory
             cd /home/ec2-user/Xcel-B2B
 
-            # Backup existing .env files
-            cp server/.env server/.env.backup
-            cp client/.env client/.env.backup
+            # Backup current env files
+            cp server/.env server/.env.backup || true
+            cp client/.env client/.env.backup || true
+            cp server/ecosystem.config.js server/ecosystem.config.js.backup || true
 
-            # Fetch latest changes
-            git fetch --all
-            git reset --hard origin/main
+            # Pull latest changes
+            git stash
+            git pull origin main
 
-            # Restore .env files
+            # Restore env files
             mv server/.env.backup server/.env
             mv client/.env.backup client/.env
+            mv server/ecosystem.config.js.backup server/ecosystem.config.js
 
-            # Backend setup
+            # Backend deployment
             cd server
-            npm ci
+            npm install
             npx prisma generate
+            pm2 restart backend || pm2 start index.js --name backend
 
-            # Frontend setup
+            # Frontend deployment
             cd ../client
-            npm ci
+            npm install
             npm run build
+            pm2 restart frontend || pm2 start npm --name frontend -- start
 
-            # Restart PM2 processes
-            cd ..
-            pm2 restart backend
-            pm2 restart frontend
+            # Save PM2 configuration
             pm2 save
