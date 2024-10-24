@@ -1,0 +1,64 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Create ENV Files
+        run: |
+          # Create server ecosystem.config.js
+          echo "module.exports = {
+            apps: [{
+              name: 'backend',
+              script: 'index.js',
+              env: {
+                PORT: 4000,
+                CORS_ORIGIN: '${{ secrets.CORS_ORIGIN }}',
+                ACCESS_JWT_SECRET: '${{ secrets.ACCESS_JWT_SECRET }}',
+                ACCESS_TOKEN_LIFE: '${{ secrets.ACCESS_TOKEN_LIFE }}',
+                REFRESH_TOKEN_SECRET: '${{ secrets.REFRESH_TOKEN_SECRET }}',
+                REFRESH_TOKEN_LIFE: '${{ secrets.REFRESH_TOKEN_LIFE }}',
+                DATABASE_URL: '${{ secrets.DATABASE_URL }}'
+              }
+            }]
+          }" > server/ecosystem.config.js
+
+          # Create client .env
+          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          ACCESS_JWT_SECRET=${{ secrets.ACCESS_JWT_SECRET }}
+          ACCESS_TOKEN_LIFE=${{ secrets.ACCESS_TOKEN_LIFE }}
+          REFRESH_TOKEN_SECRET=${{ secrets.REFRESH_TOKEN_SECRET }}
+          REFRESH_TOKEN_LIFE=${{ secrets.REFRESH_TOKEN_LIFE }}
+          NEXT_PUBLIC_IMAGE_URL=${{ secrets.NEXT_PUBLIC_IMAGE_URL }}" > client/.env
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ec2-user/Xcel-B2B
+            git pull
+
+            # Copy ENV files from Github Actions
+            cp /home/ec2-user/Xcel-B2B/server/ecosystem.config.js /home/ec2-user/Xcel-B2B/server/
+            cp /home/ec2-user/Xcel-B2B/client/.env /home/ec2-user/Xcel-B2B/client/
+
+            # Backend update
+            cd server
+            npm install
+            npx prisma generate
+            pm2 restart backend
+
+            # Frontend update
+            cd ../client
+            npm install
+            npm run build
+            pm2 restart frontend
