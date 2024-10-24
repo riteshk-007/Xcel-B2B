@@ -36,47 +36,73 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: "20m"
           script: |
+            echo "====== Starting Deployment ======"
+
             # Navigate to project directory
             cd /home/ec2-user/app/Xcel-B2B
+            echo "Current directory: $(pwd)"
 
-            # Backup current env files
+            # Backup env files
+            echo "Backing up env files..."
             cp server/.env server/.env.backup || true
             cp client/.env client/.env.backup || true
-            cp server/ecosystem.config.js server/ecosystem.config.js.backup || true
 
-            # Clear git cache and pull latest changes
-            git fetch --all
+            # Clear Git cache and pull changes
+            echo "Fetching latest changes..."
+            git checkout main
+            git fetch origin main
             git reset --hard origin/main
+            git clean -f -d
 
             # Restore env files
-            mv server/.env.backup server/.env
-            mv client/.env.backup client/.env
-            mv server/ecosystem.config.js.backup server/ecosystem.config.js
+            echo "Restoring env files..."
+            cp server/.env.backup server/.env || true
+            cp client/.env.backup client/.env || true
 
-            # Stop current processes
+            # Stop all processes
+            echo "Stopping PM2 processes..."
             pm2 stop all || true
+            pm2 delete all || true
 
-            # Clear npm cache and node_modules
+            # Setup Backend
+            echo "Setting up backend..."
             cd server
-            rm -rf node_modules package-lock.json
+            rm -rf node_modules
+            rm -f package-lock.json
+            echo "Installing backend dependencies..."
             npm cache clean --force
             npm install
+            echo "Generating Prisma client..."
             npx prisma generate
 
+            # Start Backend
+            echo "Starting backend..."
+            pm2 start index.js --name backend
+
+            # Setup Frontend
+            echo "Setting up frontend..."
             cd ../client
-            rm -rf node_modules package-lock.json .next
+            rm -rf node_modules .next
+            rm -f package-lock.json
+            echo "Installing frontend dependencies..."
             npm cache clean --force
             npm install
+            echo "Building frontend..."
             npm run build
 
-            # Start applications with PM2
-            cd ..
-            pm2 delete all || true
-            pm2 start server/index.js --name backend
-            cd client && pm2 start npm --name frontend -- start
+            # Start Frontend
+            echo "Starting frontend..."
+            pm2 start npm --name frontend -- start
 
-            # Save PM2 configuration
+            # Save PM2 config
+            echo "Saving PM2 configuration..."
             pm2 save
 
-            # Clear nginx cache if using nginx
+            # Restart Nginx
+            echo "Restarting Nginx..."
             sudo systemctl restart nginx || true
+
+            # Final status check
+            echo "Checking deployment status..."
+            pm2 list
+            echo "====== Deployment Complete ======"
