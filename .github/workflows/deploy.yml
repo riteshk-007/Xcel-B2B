@@ -16,56 +16,30 @@ jobs:
         with:
           node-version: "18"
 
-      - name: Create ecosystem config
-        run: |
-          echo "module.exports = {
-            apps: [
-              {
-                name: 'backend',
-                cwd: './server',
-                script: 'npm',
-                args: 'start',
-                env: {
-                  NODE_ENV: 'production',
-                  PORT: 5000,
-                  DATABASE_URL: '${{ secrets.DATABASE_URL }}',
-                  ACCESS_JWT_SECRET: '${{ secrets.ACCESS_JWT_SECRET }}',
-                  CORS_ORIGIN: '${{ secrets.CORS_ORIGIN }}'
-                }
-              },
-              {
-                name: 'frontend',
-                cwd: './client',
-                script: 'npm',
-                args: 'start',
-                env: {
-                  NODE_ENV: 'production',
-                  PORT: 3000,
-                  NEXT_PUBLIC_API_URL: '${{ secrets.NEXT_PUBLIC_API_URL }}'
-                }
-              }
-            ]
-          }" > ecosystem.config.js
-
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          command_timeout: "30m"
+          envs: GITHUB_SHA
           script: |
-            # Kill any existing processes
-            pm2 delete all || true
-
             # Navigate to project directory
             cd /home/ec2-user/Xcel-B2B
+
+            # Backup existing .env files
+            cp server/.env server/.env.backup
+            cp client/.env client/.env.backup
 
             # Fetch latest changes
             git fetch --all
             git reset --hard origin/main
 
-            # Copy ecosystem config
-            cp /home/ec2-user/ecosystem.config.js .
+            # Restore .env files
+            mv server/.env.backup server/.env
+            mv client/.env.backup client/.env
 
             # Backend setup
             cd server
@@ -77,7 +51,8 @@ jobs:
             npm ci
             npm run build
 
-            # Start applications using PM2
+            # Restart PM2 processes
             cd ..
-            pm2 start ecosystem.config.js
+            pm2 restart backend
+            pm2 restart frontend
             pm2 save
