@@ -9,16 +9,24 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Configure Git Credentials
+        run: |
+          git config --global credential.helper store
+          echo "https://${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
+
       - uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          fetch-depth: 0
 
       - name: Create ecosystem.config.js
         run: |
-          echo "module.exports = { 
+          echo "module.exports = {
             apps: [
-              { 
+              {
                 name: 'backend',
                 script: 'index.js',
-                env: { 
+                env: {
                   PORT: 4000,
                   CORS_ORIGIN: '${{ secrets.CORS_ORIGIN }}',
                   ACCESS_JWT_SECRET: '${{ secrets.ACCESS_JWT_SECRET }}',
@@ -47,6 +55,10 @@ jobs:
             cp server/.env server/.env.backup || true
             cp client/.env client/.env.backup || true
 
+            # Configure Git
+            git config --global credential.helper store
+            echo "https://${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
+
             # Clear Git cache and pull changes
             echo "Fetching latest changes..."
             git checkout main
@@ -59,12 +71,7 @@ jobs:
             cp server/.env.backup server/.env || true
             cp client/.env.backup client/.env || true
 
-            # Stop all processes
-            echo "Stopping PM2 processes..."
-            pm2 stop all || true
-            pm2 delete all || true
-
-            # Setup Backend
+            # Backend Deployment (without stopping previous)
             echo "Setting up backend..."
             cd server
             rm -rf node_modules
@@ -75,11 +82,18 @@ jobs:
             echo "Generating Prisma client..."
             npx prisma generate
 
-            # Start Backend
-            echo "Starting backend..."
-            pm2 start index.js --name backend
+            # Start new backend instance before stopping old one
+            echo "Starting new backend instance..."
+            pm2 start index.js --name backend-new || true
 
-            # Setup Frontend
+            # Wait for new instance to be ready
+            sleep 10
+
+            # Stop old backend instance
+            pm2 delete backend || true
+            pm2 rename backend-new backend || true
+
+            # Frontend Deployment
             echo "Setting up frontend..."
             cd ../client
             rm -rf node_modules .next
@@ -90,17 +104,24 @@ jobs:
             echo "Building frontend..."
             npm run build
 
-            # Start Frontend
-            echo "Starting frontend..."
-            pm2 start npm --name frontend -- start
+            # Start new frontend instance
+            echo "Starting new frontend instance..."
+            pm2 start npm --name frontend-new -- start
+
+            # Wait for new instance to be ready
+            sleep 10
+
+            # Stop old frontend instance
+            pm2 delete frontend || true
+            pm2 rename frontend-new frontend || true
 
             # Save PM2 config
             echo "Saving PM2 configuration..."
             pm2 save
 
-            # Restart Nginx
-            echo "Restarting Nginx..."
-            sudo systemctl restart nginx || true
+            # No need to restart Nginx unless config changed
+            # echo "Restarting Nginx..."
+            # sudo systemctl restart nginx || true
 
             # Final status check
             echo "Checking deployment status..."
