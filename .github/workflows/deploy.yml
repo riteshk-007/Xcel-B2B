@@ -41,76 +41,103 @@ jobs:
           script: |
             echo "====== Starting Deployment ======"
 
+            # Create app directory if it doesn't exist
+            mkdir -p /home/ec2-user/app/Xcel-B2B
+
             # Navigate to project directory
             cd /home/ec2-user/app/Xcel-B2B
             echo "Current directory: $(pwd)"
 
-            # Backup env files
-            echo "Backing up env files..."
-            cp server/.env server/.env.backup || true
-            cp client/.env client/.env.backup || true
-
             # Setup Git credentials in EC2
             git config --global credential.helper store
-            echo "https://riteshk-007:${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
+            echo "https://Riteshk-007:${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
             chmod 600 ~/.git-credentials
 
-            # Clear Git cache and pull changes
-            echo "Fetching latest changes..."
-            git remote set-url origin https://riteshk-007:${{ secrets.GH_TOKEN }}@github.com/riteshk-007/Xcel-B2B.git
-            git checkout main
+            # Initialize git if not already initialized
+            if [ ! -d .git ]; then
+              git init
+              git remote add origin https://Riteshk-007:${{ secrets.GH_TOKEN }}@github.com/Riteshk-007/Xcel-B2B.git
+            else
+              git remote set-url origin https://Riteshk-007:${{ secrets.GH_TOKEN }}@github.com/Riteshk-007/Xcel-B2B.git
+            fi
+
+            # Backup existing env files if they exist
+            if [ -f "server/.env" ]; then
+              cp server/.env server/.env.backup
+            fi
+            if [ -f "client/.env" ]; then
+              cp client/.env client/.env.backup
+            fi
+
+            # Fetch and reset to main
             git fetch origin main
+            git checkout -f main
             git reset --hard origin/main
-            git clean -f -d
 
-            # Restore env files
-            echo "Restoring env files..."
-            cp server/.env.backup server/.env || true
-            cp client/.env.backup client/.env || true
+            # Restore env files if backups exist
+            if [ -f "server/.env.backup" ]; then
+              cp server/.env.backup server/.env
+              rm server/.env.backup
+            fi
+            if [ -f "client/.env.backup" ]; then
+              cp client/.env.backup client/.env
+              rm client/.env.backup
+            fi
 
-            # Backend Deployment (without stopping previous)
+            # Backend Deployment
             echo "Setting up backend..."
             cd server
-            rm -rf node_modules
-            rm -f package-lock.json
+
+            # Check if node_modules exists before removing
+            if [ -d "node_modules" ]; then
+              rm -rf node_modules
+            fi
+
             echo "Installing backend dependencies..."
-            npm cache clean --force
-            npm install
+            npm install --no-audit
+
             echo "Generating Prisma client..."
             npx prisma generate
 
-            # Start new backend instance before stopping old one
+            # Start new backend instance
             echo "Starting new backend instance..."
-            pm2 start index.js --name backend-new || true
+            pm2 describe backend > /dev/null
+            BACKEND_RUNNING=$?
 
-            # Wait for new instance to be ready
-            sleep 10
-
-            # Stop old backend instance
-            pm2 delete backend || true
-            pm2 rename backend-new backend || true
+            if [ $BACKEND_RUNNING -eq 0 ]; then
+              pm2 reload backend
+            else
+              pm2 start index.js --name backend
+            fi
 
             # Frontend Deployment
             echo "Setting up frontend..."
             cd ../client
-            rm -rf node_modules .next
-            rm -f package-lock.json
+
+            # Check if directories exist before removing
+            if [ -d "node_modules" ]; then
+              rm -rf node_modules
+            fi
+            if [ -d ".next" ]; then
+              rm -rf .next
+            fi
+
             echo "Installing frontend dependencies..."
-            npm cache clean --force
-            npm install
+            npm install --no-audit
+
             echo "Building frontend..."
             npm run build
 
             # Start new frontend instance
-            echo "Starting new frontend instance..."
-            pm2 start npm --name frontend-new -- start
+            echo "Starting frontend..."
+            pm2 describe frontend > /dev/null
+            FRONTEND_RUNNING=$?
 
-            # Wait for new instance to be ready
-            sleep 10
-
-            # Stop old frontend instance
-            pm2 delete frontend || true
-            pm2 rename frontend-new frontend || true
+            if [ $FRONTEND_RUNNING -eq 0 ]; then
+              pm2 reload frontend
+            else
+              pm2 start npm --name frontend -- start
+            fi
 
             # Save PM2 config
             echo "Saving PM2 configuration..."
