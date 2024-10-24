@@ -37,33 +37,46 @@ jobs:
           command_timeout: "20m"
           script: |
             # Navigate to project directory
-            cd /home/ec2-user/Xcel-B2B
+            cd /home/ec2-user/app/Xcel-B2B
 
             # Backup current env files
             cp server/.env server/.env.backup || true
             cp client/.env client/.env.backup || true
             cp server/ecosystem.config.js server/ecosystem.config.js.backup || true
 
-            # Pull latest changes
-            git stash
-            git pull origin main
+            # Clear git cache and pull latest changes
+            git fetch --all
+            git reset --hard origin/main
 
             # Restore env files
             mv server/.env.backup server/.env
             mv client/.env.backup client/.env
             mv server/ecosystem.config.js.backup server/ecosystem.config.js
 
-            # Backend deployment
+            # Stop current processes
+            pm2 stop all || true
+
+            # Clear npm cache and node_modules
             cd server
+            rm -rf node_modules package-lock.json
+            npm cache clean --force
             npm install
             npx prisma generate
-            pm2 restart backend || pm2 start index.js --name backend
 
-            # Frontend deployment
             cd ../client
+            rm -rf node_modules package-lock.json .next
+            npm cache clean --force
             npm install
             npm run build
-            pm2 restart frontend || pm2 start npm --name frontend -- start
+
+            # Start applications with PM2
+            cd ..
+            pm2 delete all || true
+            pm2 start server/index.js --name backend
+            cd client && pm2 start npm --name frontend -- start
 
             # Save PM2 configuration
             pm2 save
+
+            # Clear nginx cache if using nginx
+            sudo systemctl restart nginx || true
