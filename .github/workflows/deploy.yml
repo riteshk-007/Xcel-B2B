@@ -8,90 +8,107 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v2
         with:
           token: ${{ secrets.GH_TOKEN }}
-          fetch-depth: 0
+          repository: riteshk-007/Xcel-B2B
 
-      - name: Setup SSH
+      - name: Create ecosystem.config.js
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/key.pem
-          chmod 600 ~/.ssh/key.pem
-          echo -e "Host ec2\n\tHostName ${{ secrets.EC2_HOST }}\n\tUser ec2-user\n\tIdentityFile ~/.ssh/key.pem\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+          echo "module.exports = { 
+            apps: [
+              { 
+                name: 'backend',
+                script: 'index.js',
+                env: { 
+                  PORT: 4000,
+                  CORS_ORIGIN: '${{ secrets.CORS_ORIGIN }}',
+                  ACCESS_JWT_SECRET: '${{ secrets.ACCESS_JWT_SECRET }}',
+                  DATABASE_URL: '${{ secrets.DATABASE_URL }}'
+                }
+              }
+            ]
+          }" > server/ecosystem.config.js
 
       - name: Deploy to EC2
-        run: |
-          ssh ec2 '
-            # Create and navigate to project directory
-            mkdir -p /home/ec2-user/app/Xcel-B2B
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: "20m"
+          script: |
+            echo "====== Starting Deployment ======"
+
+            # Navigate to project directory
             cd /home/ec2-user/app/Xcel-B2B
-
-            # Setup Git
-            git config --global credential.helper store
-            echo "https://Riteshk-007:${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
-            chmod 600 ~/.git-credentials
-
-            # Initialize or update git
-            if [ ! -d .git ]; then
-              git init
-              git remote add origin https://Riteshk-007:${{ secrets.GH_TOKEN }}@github.com/Riteshk-007/Xcel-B2B.git
-            else
-              git remote set-url origin https://Riteshk-007:${{ secrets.GH_TOKEN }}@github.com/Riteshk-007/Xcel-B2B.git
-            fi
+            echo "Current directory: $(pwd)"
 
             # Backup env files
-            [ -f "server/.env" ] && cp server/.env server/.env.backup
-            [ -f "client/.env" ] && cp client/.env client/.env.backup
+            echo "Backing up env files..."
+            cp server/.env server/.env.backup || true
+            cp client/.env client/.env.backup || true
 
-            # Fetch latest code
+            # Clear Git cache and pull changes
+            echo "Fetching latest changes..."
+            git config --global credential.helper store
+            echo "https://${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
+            git checkout main
             git fetch origin main
-            git checkout -f main
             git reset --hard origin/main
+            git clean -f -d
 
             # Restore env files
-            [ -f "server/.env.backup" ] && cp server/.env.backup server/.env
-            [ -f "client/.env.backup" ] && cp client/.env.backup client/.env
+            echo "Restoring env files..."
+            cp server/.env.backup server/.env || true
+            cp client/.env.backup client/.env || true
 
-            # Backend deployment
+            # Stop all processes
+            echo "Stopping PM2 processes..."
+            pm2 stop all || true
+            pm2 delete all || true
+
+            # Setup Backend
+            echo "Setting up backend..."
             cd server
+            rm -rf node_modules
+            rm -f package-lock.json
             echo "Installing backend dependencies..."
-            [ -d "node_modules" ] && rm -rf node_modules
-            npm install --no-audit --no-fund --silent
-
+            npm cache clean --force
+            npm install
             echo "Generating Prisma client..."
             npx prisma generate
 
-            # Restart backend
-            if pm2 describe backend > /dev/null; then
-              pm2 reload backend
-            else
-              pm2 start index.js --name backend
-            fi
+            # Start Backend
+            echo "Starting backend..."
+            pm2 start index.js --name backend
 
-            # Frontend deployment
+            # Setup Frontend
+            echo "Setting up frontend..."
             cd ../client
+            rm -rf node_modules .next
+            rm -f package-lock.json
             echo "Installing frontend dependencies..."
-            [ -d "node_modules" ] && rm -rf node_modules
-            [ -d ".next" ] && rm -rf .next
-            npm install --no-audit --no-fund --silent
-
+            npm cache clean --force
+            npm install
             echo "Building frontend..."
             npm run build
 
-            # Restart frontend
-            if pm2 describe frontend > /dev/null; then
-              pm2 reload frontend
-            else
-              pm2 start npm --name frontend -- start
-            fi
+            # Start Frontend
+            echo "Starting frontend..."
+            pm2 start npm --name frontend -- start
 
             # Save PM2 config
-            pm2 save --force
+            echo "Saving PM2 configuration..."
+            pm2 save
 
-            # Final status
+            # Restart Nginx
+            echo "Restarting Nginx..."
+            sudo systemctl restart nginx || true
+
+            # Final status check
+            echo "Checking deployment status..."
             pm2 list
-          '
+            echo "====== Deployment Complete ======"
