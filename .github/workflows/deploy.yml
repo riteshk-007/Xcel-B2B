@@ -9,12 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Configure Git Credentials
-        run: |
-          git config --global credential.helper store
-          echo "https://${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
-
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           token: ${{ secrets.GH_TOKEN }}
           fetch-depth: 0
@@ -55,12 +50,14 @@ jobs:
             cp server/.env server/.env.backup || true
             cp client/.env client/.env.backup || true
 
-            # Configure Git
+            # Setup Git credentials in EC2
             git config --global credential.helper store
-            echo "https://${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
+            echo "https://riteshk-007:${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
+            chmod 600 ~/.git-credentials
 
             # Clear Git cache and pull changes
             echo "Fetching latest changes..."
+            git remote set-url origin https://riteshk-007:${{ secrets.GH_TOKEN }}@github.com/riteshk-007/Xcel-B2B.git
             git checkout main
             git fetch origin main
             git reset --hard origin/main
@@ -118,10 +115,6 @@ jobs:
             # Save PM2 config
             echo "Saving PM2 configuration..."
             pm2 save
-
-            # No need to restart Nginx unless config changed
-            # echo "Restarting Nginx..."
-            # sudo systemctl restart nginx || true
 
             # Final status check
             echo "Checking deployment status..."
