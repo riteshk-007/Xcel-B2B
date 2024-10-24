@@ -16,15 +16,16 @@ import { useToast } from "@/hooks/use-toast";
 
 const navItems = [
   {
-    title: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
     title: "Products",
     href: "/dashboard/products",
     icon: Package,
   },
+  {
+    title: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+  },
+
   {
     title: "Leads",
     href: "/dashboard/leads",
