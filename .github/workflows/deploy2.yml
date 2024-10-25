@@ -37,7 +37,7 @@ jobs:
           command_timeout: "20m"
           script: |
             # Navigate to project directory
-            cd /home/ec2-user/app/Xcel-B2B
+            cd /home/ec2-user/Xcel-B2B
 
             # Backup current env files
             cp server/.env server/.env.backup || true
