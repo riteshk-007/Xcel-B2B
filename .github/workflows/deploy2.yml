@@ -18,10 +18,15 @@ jobs:
               { 
                 name: 'backend',
                 script: 'index.js',
+                instances: 2,
+                exec_mode: 'cluster',
+                wait_ready: true,
+                listen_timeout: 10000,
+                kill_timeout: 5000,
                 env: { 
                   PORT: 4000,
                   CORS_ORIGIN: '${{ secrets.CORS_ORIGIN_2 }}',
-                  ACCESS_JWT_SECRET: '${{ secrets.ACCESS_JWT_SECRET}}',
+                  ACCESS_JWT_SECRET: '${{ secrets.ACCESS_JWT_SECRET }}',
                   DATABASE_URL: '${{ secrets.DATABASE_URL_2 }}'
                 }
               }
@@ -33,50 +38,56 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST_2 }}
           username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY}}
+          key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: "20m"
           script: |
             # Navigate to project directory
             cd /home/ec2-user/Xcel-B2B
 
-            # Backup current env files
-            cp server/.env server/.env.backup || true
-            cp client/.env client/.env.backup || true
-            cp server/ecosystem.config.js server/ecosystem.config.js.backup || true
+            # Create temporary deployment directory
+            DEPLOY_DIR="/home/ec2-user/Xcel-B2B"
+            rm -rf $DEPLOY_DIR
+            mkdir -p $DEPLOY_DIR
 
-            # Clear git cache and pull latest changes
-            git fetch --all
-            git reset --hard origin/main
+            # Clone repository to temp directory
+            cd $DEPLOY_DIR
+            git clone https://github.com/Riteshk-007/Xcel-B2B.git .
+            git checkout main
 
-            # Restore env files
-            mv server/.env.backup server/.env
-            mv client/.env.backup client/.env
-            mv server/ecosystem.config.js.backup server/ecosystem.config.js
+            # Copy existing env files
+            cp /home/ec2-user/Xcel-B2B/server/.env server/.env
+            cp /home/ec2-user/Xcel-B2B/client/.env client/.env
+            cp /home/ec2-user/Xcel-B2B/server/ecosystem.config.js server/ecosystem.config.js
 
-            # Stop current processes
-            pm2 stop all || true
-
-            # Clear npm cache and node_modules
+            # Install dependencies and build
             cd server
-            rm -rf node_modules package-lock.json
-            npm cache clean --force
             npm install
             npx prisma generate
 
             cd ../client
-            rm -rf node_modules package-lock.json .next
-            npm cache clean --force
             npm install
             npm run build
 
-            # Start applications with PM2
-            cd ..
-            pm2 delete all || true
-            pm2 start server/index.js --name backend
-            cd client && pm2 start npm --name frontend -- start
+            # Start new instances first
+            cd $DEPLOY_DIR
+            pm2 start server/ecosystem.config.js
+
+            # Wait for new instances to be ready (adjust sleep time as needed)
+            sleep 10
+
+            # Smoothly reload old instances
+            cd /home/ec2-user/Xcel-B2B
+            pm2 reload all --update-env
+
+            # Update the main directory
+            rm -rf /home/ec2-user/Xcel-B2B/*
+            cp -r $DEPLOY_DIR/* /home/ec2-user/Xcel-B2B/
+
+            # Cleanup
+            rm -rf $DEPLOY_DIR
 
             # Save PM2 configuration
             pm2 save
 
-            # Clear nginx cache if using nginx
-            sudo systemctl restart nginx || true
+            # Optional: Gracefully reload Nginx
+            sudo nginx -t && sudo systemctl reload nginx
