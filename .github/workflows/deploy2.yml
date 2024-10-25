@@ -27,7 +27,7 @@ jobs:
                   PORT: 4000,
                   CORS_ORIGIN: '${{ secrets.CORS_ORIGIN_2 }}',
                   ACCESS_JWT_SECRET: '${{ secrets.ACCESS_JWT_SECRET }}',
-                  DATABASE_URL: '${{ secrets.DATABASE_URL_2 }}'
+                  DATABASE_URL: '${{ secrets.DATABASE_URL_2 }}
                 }
               }
             ]
@@ -45,13 +45,13 @@ jobs:
             cd /home/ec2-user/Xcel-B2B
 
             # Create temporary deployment directory
-            DEPLOY_DIR="/home/ec2-user/Xcel-B2B"
+            DEPLOY_DIR="/home/ec2-user/Xcel-B2B-temp"
             rm -rf $DEPLOY_DIR
             mkdir -p $DEPLOY_DIR
 
             # Clone repository to temp directory
-            cd $DEPLOY_DIR
-            git clone https://github.com/Riteshk-007/Xcel-B2B.git .
+             cd $DEPLOY_DIR
+            git clone https://github.com/riteshk-007/Xcel-B2B.git .
             git checkout main
 
             # Copy existing env files
