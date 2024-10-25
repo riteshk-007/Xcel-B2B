@@ -42,10 +42,10 @@ jobs:
             cd /home/ec2-user/app/Xcel-B2B
             echo "Current directory: $(pwd)"
 
-            # Backup env files
+            # Backup env files if they exist
             echo "Backing up env files..."
-            cp server/.env server/.env.backup || true
-            cp client/.env client/.env.backup || true
+            [ -f server/.env ] && cp server/.env server/.env.backup || true
+            [ -f client/.env ] && cp client/.env client/.env.backup || true
 
             # Clear Git cache and pull changes
             echo "Fetching latest changes..."
@@ -54,10 +54,10 @@ jobs:
             git reset --hard origin/main
             git clean -f -d
 
-            # Restore env files
+            # Restore env files if backups exist
             echo "Restoring env files..."
-            cp server/.env.backup server/.env || true
-            cp client/.env.backup client/.env || true
+            [ -f server/.env.backup ] && cp server/.env.backup server/.env || true
+            [ -f client/.env.backup ] && cp client/.env.backup client/.env || true
 
             # Stop all processes
             echo "Stopping PM2 processes..."
