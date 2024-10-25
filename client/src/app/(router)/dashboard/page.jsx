@@ -24,6 +24,7 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  Tooltip,
 } from "recharts";
 import {
   ChartContainer,
@@ -171,12 +172,12 @@ export default function Dashboard() {
   }));
 
   return (
-    <div className="flex-1 space-y-6 p-6 md:p-8 lg:p-10">
-      <h1 className="text-3xl font-bold tracking-tight text-primary">
+    <div className="flex-1 space-y-6 p-4 md:p-6 lg:p-8">
+      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-primary">
         Dashboard
       </h1>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {STAT_CARDS.map(({ key, title, icon }) => (
           <StatCard
             key={key}
@@ -195,7 +196,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Overview</CardTitle>
@@ -222,7 +223,7 @@ export default function Dashboard() {
                     color: "hsl(var(--chart-3))",
                   },
                 }}
-                className="h-[300px]"
+                className="h-[300px] w-full"
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -236,7 +237,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Tooltip content={<ChartTooltipContent />} />
                     <Bar dataKey="value" fill="var(--color-products)" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -277,7 +278,7 @@ export default function Dashboard() {
                     color: "hsl(var(--chart-3))",
                   },
                 }}
-                className="h-[300px]"
+                className="h-[300px] w-full"
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -287,7 +288,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
                     <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Tooltip content={<ChartTooltipContent />} />
                     <Legend />
                     <Line
                       type="monotone"
